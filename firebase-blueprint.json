@@ -1,0 +1,345 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "profileImage": { "type": "string" },
+        "defaultCurrency": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "accountStatus": { "type": "string" }
+      },
+      "required": ["userId", "displayName", "email", "defaultCurrency", "createdAt", "updatedAt"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "Travel trip master document",
+      "type": "object",
+      "properties": {
+        "tripId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "tripName": { "type": "string" },
+        "description": { "type": "string" },
+        "coverImage": { "type": "string" },
+        "destinations": { "type": "array" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "tripType": { "type": "string" },
+        "status": { "type": "string" },
+        "currency": { "type": "string" },
+        "estimatedBudget": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tripId", "ownerId", "tripName", "startDate", "endDate", "tripType", "status", "currency", "createdAt", "updatedAt"]
+    },
+    "TripMember": {
+      "title": "TripMember",
+      "description": "Member associated with a trip",
+      "type": "object",
+      "properties": {
+        "memberId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "invitationStatus": { "type": "string" },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["memberId", "tripId", "userId", "displayName", "role", "invitationStatus", "joinedAt"]
+    },
+    "Itinerary": {
+      "title": "Itinerary",
+      "description": "Daily itinerary for a trip",
+      "type": "object",
+      "properties": {
+        "itineraryId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "dayNumber": { "type": "number" },
+        "date": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["itineraryId", "tripId", "userId", "dayNumber", "date", "title", "createdAt", "updatedAt"]
+    },
+    "ItineraryActivity": {
+      "title": "ItineraryActivity",
+      "description": "Activity within an itinerary day",
+      "type": "object",
+      "properties": {
+        "activityId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "itineraryId": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "address": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "estimatedCost": { "type": "number" },
+        "currency": { "type": "string" },
+        "activityStatus": { "type": "string" },
+        "sortOrder": { "type": "number" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["activityId", "tripId", "itineraryId", "userId", "title", "activityStatus", "sortOrder", "createdAt", "updatedAt"]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Budget category plan for a trip",
+      "type": "object",
+      "properties": {
+        "budgetId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "category": { "type": "string" },
+        "estimatedAmount": { "type": "number" },
+        "actualAmount": { "type": "number" },
+        "currency": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["budgetId", "tripId", "userId", "category", "estimatedAmount", "actualAmount", "currency", "createdAt", "updatedAt"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Trip expense item",
+      "type": "object",
+      "properties": {
+        "expenseId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "category": { "type": "string" },
+        "paidBy": { "type": "string" },
+        "participantIds": { "type": "array" },
+        "splitType": { "type": "string" },
+        "expenseDate": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["expenseId", "tripId", "userId", "title", "amount", "currency", "category", "paidBy", "splitType", "expenseDate", "createdAt", "updatedAt"]
+    },
+    "ExpenseSplit": {
+      "title": "ExpenseSplit",
+      "description": "Per-user split for an expense",
+      "type": "object",
+      "properties": {
+        "splitId": { "type": "string" },
+        "expenseId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "owedAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "settlementStatus": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["splitId", "expenseId", "tripId", "userId", "owedAmount", "paidAmount", "settlementStatus", "createdAt", "updatedAt"]
+    },
+    "Settlement": {
+      "title": "Settlement",
+      "description": "Debt settlement between trip members",
+      "type": "object",
+      "properties": {
+        "settlementId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "fromUserId": { "type": "string" },
+        "toUserId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "settlementDate": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["settlementId", "tripId", "userId", "fromUserId", "toUserId", "amount", "currency", "settlementDate", "status", "createdAt"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "Travel diary memory entry",
+      "type": "object",
+      "properties": {
+        "entryId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "imageReferences": { "type": "array" },
+        "location": { "type": "string" },
+        "entryDate": { "type": "string" },
+        "rating": { "type": "number" },
+        "tags": { "type": "array" },
+        "isFavorite": { "type": "boolean" },
+        "visibility": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["entryId", "tripId", "userId", "title", "content", "entryDate", "rating", "isFavorite", "visibility", "createdAt", "updatedAt"]
+    },
+    "PackingList": {
+      "title": "PackingList",
+      "description": "Packing list container",
+      "type": "object",
+      "properties": {
+        "listId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "listName": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["listId", "tripId", "userId", "listName", "category", "createdAt", "updatedAt"]
+    },
+    "PackingItem": {
+      "title": "PackingItem",
+      "description": "Individual packing checklist item",
+      "type": "object",
+      "properties": {
+        "itemId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "listId": { "type": "string" },
+        "userId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "isPacked": { "type": "boolean" },
+        "notes": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["itemId", "tripId", "listId", "userId", "itemName", "quantity", "isPacked", "category", "createdAt", "updatedAt"]
+    },
+    "TripDestination": {
+      "title": "TripDestination",
+      "description": "Destination stop on a trip",
+      "type": "object",
+      "properties": {
+        "destinationId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "destinationName": { "type": "string" },
+        "country": { "type": "string" },
+        "address": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "arrivalDate": { "type": "string" },
+        "departureDate": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["destinationId", "tripId", "userId", "destinationName", "country"]
+    },
+    "NotificationItem": {
+      "title": "NotificationItem",
+      "description": "User notification reminder",
+      "type": "object",
+      "properties": {
+        "notificationId": { "type": "string" },
+        "userId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "notificationType": { "type": "string" },
+        "scheduledAt": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["notificationId", "userId", "title", "message", "notificationType", "isRead", "createdAt"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User preferences and settings",
+      "type": "object",
+      "properties": {
+        "settingsId": { "type": "string" },
+        "userId": { "type": "string" },
+        "defaultCurrency": { "type": "string" },
+        "theme": { "type": "string" },
+        "notificationsEnabled": { "type": "boolean" },
+        "reminderPreferences": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["settingsId", "userId", "defaultCurrency", "theme", "notificationsEnabled", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User accounts collection"
+    },
+    "/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "Trips collection"
+    },
+    "/trip_members/{memberId}": {
+      "schema": "TripMember",
+      "description": "Trip members collection"
+    },
+    "/itineraries/{itineraryId}": {
+      "schema": "Itinerary",
+      "description": "Itinerary days collection"
+    },
+    "/itinerary_activities/{activityId}": {
+      "schema": "ItineraryActivity",
+      "description": "Itinerary activities collection"
+    },
+    "/budgets/{budgetId}": {
+      "schema": "Budget",
+      "description": "Trip budget allocations"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Trip expenses collection"
+    },
+    "/expense_splits/{splitId}": {
+      "schema": "ExpenseSplit",
+      "description": "Expense split shares"
+    },
+    "/settlements/{settlementId}": {
+      "schema": "Settlement",
+      "description": "Debt settlement records"
+    },
+    "/journal_entries/{entryId}": {
+      "schema": "JournalEntry",
+      "description": "Travel journal memories"
+    },
+    "/packing_lists/{listId}": {
+      "schema": "PackingList",
+      "description": "Packing checklists"
+    },
+    "/packing_items/{itemId}": {
+      "schema": "PackingItem",
+      "description": "Packing items"
+    },
+    "/trip_destinations/{destinationId}": {
+      "schema": "TripDestination",
+      "description": "Destinations for trips"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "NotificationItem",
+      "description": "User notifications"
+    },
+    "/user_settings/{settingsId}": {
+      "schema": "UserSettings",
+      "description": "User settings"
+    }
+  }
+}

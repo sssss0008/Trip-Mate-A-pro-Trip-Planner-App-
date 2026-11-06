@@ -1,0 +1,6 @@
+{
+  "name": "TripMate",
+  "description": "Plan Together. Travel Better. Complete travel planner with trip management, itineraries, budgets, packing lists, expense sharing, and travel journal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

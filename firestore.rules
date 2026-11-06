@@ -1,0 +1,467 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // --- Users ---
+    function isValidUser(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             data.email is string && data.email.size() <= 150 &&
+             (!('profileImage' in data) || data.profileImage == null || (data.profileImage is string && data.profileImage.size() <= 500)) &&
+             data.defaultCurrency is string && data.defaultCurrency.size() <= 10 &&
+             (!('accountStatus' in data) || data.accountStatus == null || (data.accountStatus is string && data.accountStatus.size() <= 50));
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUser(incoming());
+      allow update: if isOwner(userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUser(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'profileImage', 'defaultCurrency', 'accountStatus', 'updatedAt']);
+      allow delete: if isOwner(userId);
+    }
+
+    // --- Trips ---
+    function isValidTrip(data) {
+      return data.tripId is string && data.tripId.size() <= 128 &&
+             data.ownerId is string && data.ownerId == request.auth.uid &&
+             data.tripName is string && data.tripName.size() >= 1 && data.tripName.size() <= 150 &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 2000)) &&
+             (!('coverImage' in data) || data.coverImage == null || (data.coverImage is string && data.coverImage.size() <= 500)) &&
+             (!('destinations' in data) || (data.destinations is list && data.destinations.size() <= 20)) &&
+             data.startDate is string && data.startDate.size() <= 50 &&
+             data.endDate is string && data.endDate.size() <= 50 &&
+             data.tripType is string && data.tripType.size() <= 50 &&
+             data.status is string && data.status.size() <= 50 &&
+             data.currency is string && data.currency.size() <= 10 &&
+             (!('estimatedBudget' in data) || data.estimatedBudget is number);
+    }
+
+    match /trips/{tripId} {
+      allow get: if isSignedIn() && isValidId(tripId) && resource.data.ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(tripId) &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidTrip(incoming());
+      allow update: if isSignedIn() && isValidId(tripId) &&
+                       existing().ownerId == request.auth.uid &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().tripId == existing().tripId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidTrip(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['tripName', 'description', 'coverImage', 'destinations', 'startDate', 'endDate', 'tripType', 'status', 'currency', 'estimatedBudget', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(tripId) && existing().ownerId == request.auth.uid;
+    }
+
+    // --- Trip Members ---
+    function isValidTripMember(data) {
+      return data.memberId is string && data.memberId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.role is string && data.role.size() <= 50 &&
+             data.invitationStatus is string && data.invitationStatus.size() <= 50 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 150));
+    }
+
+    match /trip_members/{memberId} {
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.invitedBy == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(memberId) &&
+                       incoming().joinedAt is timestamp && incoming().joinedAt <= request.time &&
+                       isValidTripMember(incoming());
+      allow update: if isSignedIn() && isValidId(memberId) &&
+                       incoming().memberId == existing().memberId &&
+                       incoming().tripId == existing().tripId &&
+                       incoming().joinedAt == existing().joinedAt &&
+                       isValidTripMember(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'invitationStatus', 'email']);
+      allow delete: if isSignedIn() && isValidId(memberId) && (existing().userId == request.auth.uid || existing().invitedBy == request.auth.uid);
+    }
+
+    // --- Itineraries ---
+    function isValidItinerary(data) {
+      return data.itineraryId is string && data.itineraryId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.dayNumber is number &&
+             data.date is string && data.date.size() <= 50 &&
+             data.title is string && data.title.size() <= 150 &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 2000));
+    }
+
+    match /itineraries/{itineraryId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(itineraryId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidItinerary(incoming());
+      allow update: if isSignedIn() && isValidId(itineraryId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidItinerary(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['dayNumber', 'date', 'title', 'description', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(itineraryId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Itinerary Activities ---
+    function isValidActivity(data) {
+      return data.activityId is string && data.activityId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.itineraryId is string && data.itineraryId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 150 &&
+             data.activityStatus is string && data.activityStatus.size() <= 50 &&
+             data.sortOrder is number &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 2000)) &&
+             (!('location' in data) || data.location == null || (data.location is string && data.location.size() <= 200)) &&
+             (!('address' in data) || data.address == null || (data.address is string && data.address.size() <= 300)) &&
+             (!('startTime' in data) || data.startTime == null || (data.startTime is string && data.startTime.size() <= 50)) &&
+             (!('endTime' in data) || data.endTime == null || (data.endTime is string && data.endTime.size() <= 50)) &&
+             (!('estimatedCost' in data) || data.estimatedCost is number) &&
+             (!('currency' in data) || data.currency == null || (data.currency is string && data.currency.size() <= 10)) &&
+             (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 2000));
+    }
+
+    match /itinerary_activities/{activityId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(activityId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidActivity(incoming());
+      allow update: if isSignedIn() && isValidId(activityId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidActivity(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'location', 'address', 'startTime', 'endTime', 'estimatedCost', 'currency', 'activityStatus', 'sortOrder', 'notes', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(activityId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Budgets ---
+    function isValidBudget(data) {
+      return data.budgetId is string && data.budgetId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.category is string && data.category.size() <= 80 &&
+             data.estimatedAmount is number &&
+             data.actualAmount is number &&
+             data.currency is string && data.currency.size() <= 10;
+    }
+
+    match /budgets/{budgetId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(budgetId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidBudget(incoming());
+      allow update: if isSignedIn() && isValidId(budgetId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidBudget(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['category', 'estimatedAmount', 'actualAmount', 'currency', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(budgetId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Expenses ---
+    function isValidExpense(data) {
+      return data.expenseId is string && data.expenseId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 150 &&
+             data.amount is number &&
+             data.currency is string && data.currency.size() <= 10 &&
+             data.category is string && data.category.size() <= 80 &&
+             data.paidBy is string && data.paidBy.size() <= 100 &&
+             data.splitType is string && data.splitType.size() <= 50 &&
+             data.expenseDate is string && data.expenseDate.size() <= 50 &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 2000)) &&
+             (!('participantIds' in data) || (data.participantIds is list && data.participantIds.size() <= 50));
+    }
+
+    match /expenses/{expenseId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(expenseId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidExpense(incoming());
+      allow update: if isSignedIn() && isValidId(expenseId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidExpense(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'amount', 'currency', 'category', 'paidBy', 'participantIds', 'splitType', 'expenseDate', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(expenseId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Expense Splits ---
+    function isValidExpenseSplit(data) {
+      return data.splitId is string && data.splitId.size() <= 128 &&
+             data.expenseId is string && data.expenseId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.owedAmount is number &&
+             data.paidAmount is number &&
+             data.settlementStatus is string && data.settlementStatus.size() <= 50;
+    }
+
+    match /expense_splits/{splitId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(splitId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidExpenseSplit(incoming());
+      allow update: if isSignedIn() && isValidId(splitId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidExpenseSplit(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['owedAmount', 'paidAmount', 'settlementStatus', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(splitId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Settlements ---
+    function isValidSettlement(data) {
+      return data.settlementId is string && data.settlementId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.fromUserId is string && data.fromUserId.size() <= 128 &&
+             data.toUserId is string && data.toUserId.size() <= 128 &&
+             data.amount is number &&
+             data.currency is string && data.currency.size() <= 10 &&
+             data.settlementDate is string && data.settlementDate.size() <= 50 &&
+             data.status is string && data.status.size() <= 50 &&
+             (!('paymentMethod' in data) || data.paymentMethod == null || (data.paymentMethod is string && data.paymentMethod.size() <= 50)) &&
+             (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    match /settlements/{settlementId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(settlementId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       isValidSettlement(incoming());
+      allow update: if isSignedIn() && isValidId(settlementId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidSettlement(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentMethod', 'notes']);
+      allow delete: if isSignedIn() && isValidId(settlementId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Journal Entries ---
+    function isValidJournal(data) {
+      return data.entryId is string && data.entryId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 200 &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.entryDate is string && data.entryDate.size() <= 50 &&
+             data.rating is number &&
+             data.isFavorite is bool &&
+             data.visibility is string && data.visibility.size() <= 50 &&
+             (!('location' in data) || data.location == null || (data.location is string && data.location.size() <= 200)) &&
+             (!('imageReferences' in data) || (data.imageReferences is list && data.imageReferences.size() <= 30)) &&
+             (!('tags' in data) || (data.tags is list && data.tags.size() <= 20));
+    }
+
+    match /journal_entries/{entryId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(entryId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidJournal(incoming());
+      allow update: if isSignedIn() && isValidId(entryId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidJournal(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'imageReferences', 'location', 'entryDate', 'rating', 'tags', 'isFavorite', 'visibility', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(entryId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Packing Lists & Items ---
+    function isValidPackingList(data) {
+      return data.listId is string && data.listId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.listName is string && data.listName.size() <= 150 &&
+             data.category is string && data.category.size() <= 80;
+    }
+
+    match /packing_lists/{listId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(listId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidPackingList(incoming());
+      allow update: if isSignedIn() && isValidId(listId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidPackingList(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['listName', 'category', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(listId) && existing().userId == request.auth.uid;
+    }
+
+    function isValidPackingItem(data) {
+      return data.itemId is string && data.itemId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.listId is string && data.listId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.itemName is string && data.itemName.size() <= 150 &&
+             data.quantity is number &&
+             data.isPacked is bool &&
+             data.category is string && data.category.size() <= 80 &&
+             (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 500));
+    }
+
+    match /packing_items/{itemId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(itemId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidPackingItem(incoming());
+      allow update: if isSignedIn() && isValidId(itemId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidPackingItem(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['itemName', 'quantity', 'isPacked', 'category', 'notes', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(itemId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Trip Destinations ---
+    function isValidDestination(data) {
+      return data.destinationId is string && data.destinationId.size() <= 128 &&
+             data.tripId is string && data.tripId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.destinationName is string && data.destinationName.size() <= 150 &&
+             data.country is string && data.country.size() <= 100 &&
+             (!('address' in data) || data.address == null || (data.address is string && data.address.size() <= 300)) &&
+             (!('latitude' in data) || data.latitude is number) &&
+             (!('longitude' in data) || data.longitude is number) &&
+             (!('arrivalDate' in data) || data.arrivalDate == null || (data.arrivalDate is string && data.arrivalDate.size() <= 50)) &&
+             (!('departureDate' in data) || data.departureDate == null || (data.departureDate is string && data.departureDate.size() <= 50)) &&
+             (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    match /trip_destinations/{destinationId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(destinationId) &&
+                       incoming().userId == request.auth.uid &&
+                       isValidDestination(incoming());
+      allow update: if isSignedIn() && isValidId(destinationId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       isValidDestination(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['destinationName', 'country', 'address', 'latitude', 'longitude', 'arrivalDate', 'departureDate', 'notes']);
+      allow delete: if isSignedIn() && isValidId(destinationId) && existing().userId == request.auth.uid;
+    }
+
+    // --- Notifications ---
+    function isValidNotification(data) {
+      return data.notificationId is string && data.notificationId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 150 &&
+             data.message is string && data.message.size() <= 1000 &&
+             data.notificationType is string && data.notificationType.size() <= 50 &&
+             data.isRead is bool &&
+             (!('tripId' in data) || data.tripId == null || (data.tripId is string && data.tripId.size() <= 128)) &&
+             (!('scheduledAt' in data) || data.scheduledAt == null || (data.scheduledAt is string && data.scheduledAt.size() <= 50));
+    }
+
+    match /notifications/{notificationId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(notificationId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       isValidNotification(incoming());
+      allow update: if isSignedIn() && isValidId(notificationId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidNotification(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isSignedIn() && isValidId(notificationId) && existing().userId == request.auth.uid;
+    }
+
+    // --- User Settings ---
+    function isValidSettings(data) {
+      return data.settingsId is string && data.settingsId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.defaultCurrency is string && data.defaultCurrency.size() <= 10 &&
+             data.theme is string && data.theme.size() <= 20 &&
+             data.notificationsEnabled is bool &&
+             (!('reminderPreferences' in data) || data.reminderPreferences == null || (data.reminderPreferences is string && data.reminderPreferences.size() <= 500));
+    }
+
+    match /user_settings/{settingsId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(settingsId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidSettings(incoming());
+      allow update: if isSignedIn() && isValidId(settingsId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidSettings(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['defaultCurrency', 'theme', 'notificationsEnabled', 'reminderPreferences', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(settingsId) && existing().userId == request.auth.uid;
+    }
+  }
+}
